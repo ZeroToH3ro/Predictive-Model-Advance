@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Model artifacts / outputs
+*.h5
+*.hdf5
+*.joblib
+*.pkl
+
+# Data outputs
+*.csv
+*.tsv
+*.parquet
+
+# Notebooks
+*.nbconvert.ipynb
+
+# LightGBM / XGBoost
+*.model
+*.txt
+
