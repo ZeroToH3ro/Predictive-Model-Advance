@@ -2,20 +2,20 @@
 
 ## Setup
 
-### 1) Create a virtual environment (Python 3.9+)
+### Create a virtual environment (Python 3.9+)
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-### 2) Install dependencies
+### Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3) Run the notebook
+### Run the notebook
 
 ```bash
 python -m pip install jupyter

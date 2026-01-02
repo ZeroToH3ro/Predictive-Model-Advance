@@ -33,6 +33,7 @@ ENV/
 *.pkl
 
 # Data outputs
+outputs
 *.csv
 *.tsv
 *.parquet
