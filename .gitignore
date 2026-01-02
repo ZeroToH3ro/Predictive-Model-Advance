@@ -34,7 +34,6 @@ ENV/
 
 # Data outputs
 outputs
-*.csv
 *.tsv
 *.parquet
 
