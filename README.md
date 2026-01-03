@@ -34,3 +34,7 @@ The dataset `data_training_162_model.csv` is included in the repo. Keep the note
 - Saves per-model predictions/metrics to `outputs/Experiment_Model_<timestamp>/` (Excel files).
 - Generates comparison visuals: a grouped-bar chart of core metrics and an overlay ROC chart for all models (PNG files in the same run directory).
 - SHAP explainability runs on the best SVM model sample if available.
+
+## Workflow details
+
+See `WORKFLOW.md` for a step-by-step explanation of how the notebook builds features, trains models, selects thresholds, and writes outputs.
