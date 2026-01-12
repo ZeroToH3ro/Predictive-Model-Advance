@@ -18,21 +18,24 @@ This document explains how `Predictive_model.ipynb` creates the model results, m
    - `build_feature_matrix(...)` uses RAS-only features; targets come from `data_RAS.xlsx:Respond`.
    - Targets are built by `build_target`: `SVR -> 0`, `Non SVR -> 1` (raises if other label values exist).
    - NaN/±inf are replaced with 0 in `X`.
-3. **Train/test split**
+3. **(Optional) Visualize data with t-SNE**
+   - `plot_tsne_embedding(...)` builds a 2D t-SNE embedding of the feature matrix and colors points by `Respond`.
+   - Saves `tsne_training_data_<label>.png` into the per-run output folder.
+4. **Train/test split**
    - 60/40 split with stratification (`random_state=42`).
-4. **Model pipelines**
+5. **Model pipelines**
    - Preprocessing: `VarianceThreshold` → `StandardScaler` → `SMOTE` → `FiniteClipper`.
    - SVM adds `PCA(n_components=0.95)` before the classifier.
-5. **Model selection**
+6. **Model selection**
    - `GridSearchCV(cv=5, scoring="roc_auc")` over:
      - SVM (RBF), Elastic Net logistic regression, Random Forest, GBM, Decision Tree
      - Optional XGBoost (if importable and `include_xgboost=True`)
-6. **Threshold selection + metrics**
+7. **Threshold selection + metrics**
    - `optimize_threshold(...)` uses Youden index (`tpr - fpr`) from the ROC curve.
    - Metrics: Accuracy, Precision, Recall, F1, AUC, plus the chosen `Threshold`.
-7. **Save plots and tables**
+8. **Save plots and tables**
    - Writes Excel summaries + comparison plots to `save_path` (the per-run `run_dir`).
-8. **Optional analysis**
+9. **Optional analysis**
    - `plot_learning_curve(...)` saves an AUC learning curve for the SVM model (if trained).
    - `explain_with_shap(...)` runs SHAP on a small sample (if `shap` is installed) and produces genotype-focused plots.
 
@@ -43,6 +46,7 @@ Created in `outputs/Experiment_Model_<timestamp>/`:
 - `model_metric_comparison_<label>.png`: bar chart of core metrics.
 - `roc_comparison_<label>.png`: ROC overlay for all models.
 - `learning_curve_<label>.png`: SVM learning curve (if generated).
+- `tsne_training_data_<label>.png`: t-SNE embedding colored by `Respond` (if generated).
 - `shap_values_<label>.xlsx`: SHAP values table (if generated).
 - `shap_summary_<label>.png`: SHAP summary plot (genotype features only, if generated).
 - `shap_heatmap_<label>.png`: SHAP heatmap (genotype features only, if generated).
