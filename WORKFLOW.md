@@ -9,19 +9,13 @@ This document explains how `Predictive_model.ipynb` creates the model results, m
     - Numeric columns (excluding `No`/`id`)
     - `Genotype` (one-hot encoded into `Genotype_*`)
     - Mutation list columns (name contains `mut`, `mutation`, `resistance`, or `ras`) converted to mutation counts
-- Sequence file (optional): CSV/XLSX set via `sequence_path` when `use_sequence=True`
-  - Required columns: `Accession number`, `Respond`, plus sequence columns:
-    - Amino acids: `NS3_aa`, `NS5A_aa`, `NS5B_aa` (`seq_type="aa"`)
-    - Nucleotides: `NS3_Nu`, `NS5A_Nu`, `NS5B_Nu` (`seq_type="dna"`)
 
 ## Workflow steps (ordered)
 1. **(Optional) Analyze RAS significance**
    - `analyze_ras_significance(...)` runs Fisher's exact test over `all_resistance_muts_ns3/ns5a/ns5b`.
    - Prints mutations significantly associated with `Non SVR` (filters by `min_support` and `alpha`).
 2. **Build features + targets**
-   - `build_feature_matrix(...)` supports two modes:
-     - `use_sequence=False` (current notebook default): uses RAS-only features; targets come from `data_RAS.xlsx:Respond`.
-     - `use_sequence=True`: loads and encodes sequences, aligns with RAS on `Accession number`, and concatenates `seq_*` + RAS features.
+   - `build_feature_matrix(...)` uses RAS-only features; targets come from `data_RAS.xlsx:Respond`.
    - Targets are built by `build_target`: `SVR -> 0`, `Non SVR -> 1` (raises if other label values exist).
    - NaN/±inf are replaced with 0 in `X`.
 3. **Train/test split**
@@ -55,7 +49,7 @@ Created in `outputs/Experiment_Model_<timestamp>/`:
 
 ## How the results are created
 The final notebook cell sets:
-- `sequence_path`, `ras_path`, and `seq_type`
+- `ras_path`
 - `run_dir = outputs/Experiment_Model_<timestamp>`
 Then it calls:
 - `analyze_ras_significance(...)` (prints Fisher-test results)
@@ -67,7 +61,7 @@ Then it calls:
 ## How to reproduce
 1. Install dependencies from `requirements.txt`.
 2. Launch Jupyter and open `Predictive_model.ipynb`.
-3. Set `ras_path` (and optionally `sequence_path` + `use_sequence=True`) in the final cell.
+3. Set `ras_path` in the final cell.
 4. Run all cells to generate the outputs in `outputs/Experiment_Model_<timestamp>/`.
 
 To include XGBoost, install `xgboost` and leave `include_xgboost=True` in
