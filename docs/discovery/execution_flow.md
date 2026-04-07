@@ -56,6 +56,9 @@ from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline
 
+# Sequence encoding (3seq & Full notebooks only)
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+
 # Custom
 from model_utils import FiniteClipper
 ```
@@ -154,29 +157,68 @@ Output: SHAP plots
 
 ```
 1. Load CSV: data_complete.csv
-2. Mã hóa biến mục tiêu (giống RAS)
-3. Trích xuất 3seq features (đặc trưng trình tự cụ thể)
-4. Kết quả: DataFrame chỉ chứa 3seq features + target
+2. Mã hóa biến mục tiêu:
+   - Mapping: {'Yes': 1, 'No': 0, 'SVR': 0, 'Non SVR': 1, 'SVR ': 0, 'Non SVR ': 1}
+3. Trích xuất trình tự từ 3 vùng gene: NS3, NS5A, NS5B
+4. Chạy 2 thí nghiệm riêng biệt:
+
+   [Amino Acid]:
+   - Đọc cột trình tự amino acid cho mỗi vùng gene
+   - Mã hóa: amino acid → integers 1–20 (alphabet "ACDEFGHIKLMNPQRSTVWY")
+   - Unknown/missing → 0
+   - Padding: pad_sequences(maxlen=max_seq_len, padding='post', value=0)
+   - Ghép nối 3 vùng → flatten thành mảng 2D: (n_samples, 3 × max_seq_len)
+
+   [Nucleotide]:
+   - Đọc cột trình tự nucleotide cho mỗi vùng gene
+   - Mã hóa: {A:1, C:2, G:3, T:4}, unknown → 0
+   - Padding: pad_sequences(maxlen=max_seq_len, padding='post', value=0)
+   - Ghép nối 3 vùng → flatten thành mảng 2D: (n_samples, 3 × max_seq_len)
+
+5. Kết quả: 2 feature matrices (Aa và Nu) + target
 ```
 
 ### Predictive_model_full.ipynb
 
 ```
 1. Load CSV: data_complete.csv
-2. Mã hóa biến mục tiêu (giống RAS)
-3. Sử dụng TẤT CẢ features có sẵn
-4. Kết quả: DataFrame đầy đủ + target
+2. Mã hóa biến mục tiêu (giống 3seq)
+3. Chạy 2 thí nghiệm riêng biệt:
+
+   [Amino Acid]:
+   - Đọc cột 'Full aa' — trình tự amino acid đầy đủ
+   - Mã hóa: amino acid → integers 1–20 (giống 3seq)
+   - Padding: pad_sequences(maxlen=max_seq_len, padding='post', value=0)
+   - Flatten thành mảng 2D: (n_samples, max_seq_len)
+
+   [Nucleotide]:
+   - Đọc cột 'Full Nu' — trình tự nucleotide đầy đủ
+   - Mã hóa: {A:1, C:2, G:3, T:4} (giống 3seq)
+   - Padding: pad_sequences(maxlen=max_seq_len, padding='post', value=0)
+   - Flatten thành mảng 2D: (n_samples, max_seq_len)
+
+4. Kết quả: 2 feature matrices (Aa và Nu) + target
+
+⚠️ Khác biệt với 3seq: Full sử dụng 1 trình tự nguyên vẹn thay vì
+   ghép nối 3 vùng gene riêng biệt → số chiều features khác nhau
 ```
 
 ---
 
 ## Bước 4: Feature Engineering
 
-### Chung cho cả 3 notebooks
+### Predictive_model_ras.ipynb
 ```
 1. Tạo dummy variables cho genotype columns (one-hot encoding)
 2. Loại bỏ cột genotype gốc
 3. Kết hợp features đã mã hóa với DataFrame chính
+```
+
+### Predictive_model_3seq.ipynb & Predictive_model_full.ipynb
+```
+1. Sequence encoding đã hoàn thành ở Bước 3 (integers + padding)
+2. Không cần dummy encoding — features đã ở dạng numerical
+3. Mỗi notebook chạy 2 thí nghiệm (Amino Acid + Nucleotide) tuần tự
 ```
 
 ---
@@ -276,12 +318,22 @@ Gọi explain_with_shap(results, save_path):
 
 ## Bước 9: Export Kết Quả
 
-### Output files (trong thư mục results/)
+### Output files
+
+**RAS notebook** (trong thư mục `outputs/`):
 - `*_results.xlsx` — Metrics tổng hợp cho tất cả models
 - `*_bootstrap_summary.xlsx` — Bootstrap sensitivity analysis
-- ROC curve plots (hiển thị inline)
-- Learning curve plots (hiển thị inline)
-- SHAP summary/heatmap plots (hiển thị inline)
+- ROC curve plots, Learning curve plots, SHAP plots (hiển thị inline)
+
+**3seq notebook** (trong thư mục `outputs/`):
+- `outputs/Experiment_Aa_<timestamp>/` — Kết quả Amino Acid
+- `outputs/Experiment_Nu_<timestamp>/` — Kết quả Nucleotide
+- Mỗi thư mục chứa: Excel results, bootstrap summary, plots
+
+**Full notebook** (trong thư mục `outputs/`):
+- `outputs/Experiment_Aa_<timestamp>/` — Kết quả Amino Acid
+- `outputs/Experiment_Nu_<timestamp>/` — Kết quả Nucleotide
+- Mỗi thư mục chứa: Excel results, bootstrap summary, plots
 
 ---
 
@@ -302,13 +354,16 @@ graph TD
         B1[Load CSV] --> B2[Encode Target]
         B2 --> B3{Notebook Type?}
         B3 -->|RAS| B4[RAS Significance Analysis]
-        B3 -->|3seq| B5[Extract 3seq Features]
-        B3 -->|Full| B6[Use All Features]
-        B4 --> B7[Feature Selection]
-        B5 --> B7
-        B6 --> B7
-        B7 --> B8[Dummy Encoding for Genotypes]
-        B8 --> B9[Train/Test Split - 60/40 stratified]
+        B3 -->|3seq| B5[Extract 3 Gene Regions - NS3 NS5A NS5B]
+        B3 -->|Full| B6[Extract Full-length Sequences]
+        B4 --> B7[Feature Selection + Dummy Encoding]
+        B5 --> B5a[Integer Encode + Pad Sequences]
+        B6 --> B6a[Integer Encode + Pad Sequences]
+        B5a --> B5b{Run Aa and Nu experiments}
+        B6a --> B6b{Run Aa and Nu experiments}
+        B7 --> B9[Train/Test Split - 60/40 stratified]
+        B5b --> B9
+        B6b --> B9
     end
 
     subgraph "Phase 3: Modeling"
@@ -345,15 +400,22 @@ graph TD
 
 | Đặc điểm | RAS | 3seq | Full |
 |-----------|-----|------|------|
-| Input features | RAS mutations | 3seq features | All features |
+| Input features | RAS mutations + genotype | Trình tự 3 vùng gene (NS3, NS5A, NS5B) | Trình tự đầy đủ (full-length) |
+| Nguồn dữ liệu | Cột mutation + genotype | Cột sequence cho 3 vùng | Cột 'Full aa' / 'Full Nu' |
+| Mã hóa features | Numerical + one-hot genotype | Integer encoding + padding | Integer encoding + padding |
+| Số thí nghiệm | 1 | 2 (Amino Acid + Nucleotide) | 2 (Amino Acid + Nucleotide) |
 | RAS significance analysis | ✅ Có | ❌ Không | ❌ Không |
 | Fisher's exact test | ✅ Có | ❌ Không | ❌ Không |
-| Số lượng features | Ít (RAS only) | Trung bình | Nhiều nhất |
+| Sequence padding | ❌ Không | ✅ pad_sequences (3 vùng ghép nối) | ✅ pad_sequences (1 trình tự) |
+| Số lượng features | Thấp (RAS only) | Trung bình (3 × max_seq_len) | Cao (max_seq_len) |
 | Pipeline structure | Giống nhau | Giống nhau | Giống nhau |
 | Models used | 13 models | 13 models | 13 models |
 | Hyperparameter grids | Giống nhau | Giống nhau | Giống nhau |
 | Bootstrap iterations | 1000 | 1000 | 1000 |
 | SHAP analysis | ✅ Có | ✅ Có | ✅ Có |
+| Output directories | `outputs/` | `outputs/Experiment_Aa_*/`, `outputs/Experiment_Nu_*/` | `outputs/Experiment_Aa_*/`, `outputs/Experiment_Nu_*/` |
+| Best CV AUC | 0.8845 (RF) | 0.8973 (XGBoost, Nu) | 0.9045 (Elastic Net, Aa) |
+| Thư viện bổ sung | — | tensorflow/keras (pad_sequences) | tensorflow/keras (pad_sequences) |
 
 ---
 
@@ -374,6 +436,19 @@ class FiniteClipper(BaseEstimator, TransformerMixin):
 - SMOTE chỉ được áp dụng trong quá trình `fit` (training)
 - Không áp dụng khi `predict` → đúng thực hành ML
 - `imblearn.pipeline.Pipeline` (không phải `sklearn.pipeline.Pipeline`) đảm bảo điều này
+
+### Sequence Encoding (3seq & Full notebooks)
+- **Amino Acid alphabet**: "ACDEFGHIKLMNPQRSTVWY" → integers 1–20, unknown → 0
+- **Nucleotide mapping**: {A:1, C:2, G:3, T:4}, unknown → 0
+- **Padding**: `pad_sequences(maxlen=max_seq_len, padding='post', value=0)`
+- **3seq**: Ghép nối 3 vùng gene → shape: `(n_samples, 3 × max_region_len)`
+- **Full**: 1 trình tự → shape: `(n_samples, max_full_len)`
+- Padding value 0 đóng vai trò như "missing" indicator, được xử lý bởi VarianceThreshold nếu variance = 0
+
+### Lưu ý về SVM trên Full features
+- SVM + PCA(0.95) thất bại nghiêm trọng trên Full features (test AUC ~0.12)
+- CV AUC bình thường (~0.84), cho thấy overfitting trong cross-validation
+- Nguyên nhân có thể: PCA trên full-length padded sequences tạo components không đại diện
 
 ---
 
