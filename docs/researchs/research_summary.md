@@ -2,7 +2,16 @@
 
 ## Tóm Tắt (Abstract)
 
-Nghiên cứu này trình bày một framework học máy toàn diện nhằm dự đoán phản ứng điều trị (SVR vs Non-SVR) dựa trên ba chiến lược trích xuất đặc trưng: (1) đặc trưng RAS (Resistance-Associated Substitutions), (2) đặc trưng 3seq, và (3) bộ đặc trưng đầy đủ kết hợp. Mười ba thuật toán phân loại — bao gồm SVM, Random Forest, XGBoost, Gradient Boosting, Elastic Net, và các mô hình ensemble — được đánh giá thông qua cross-validation 5-fold, tối ưu ngưỡng bằng chỉ số Youden's J, và phân tích độ nhạy bootstrap (1.000 lần lặp). Khả năng diễn giải mô hình được thực hiện bằng SHAP values. Random Forest đạt hiệu suất cross-validation cao nhất (AUC = 0.8845), trong khi SVM đạt test AUC cao nhất (0.8303). Phân tích Fisher's exact test xác định mutation 31M là biomarker có ý nghĩa thống kê mạnh nhất (OR = 13.68, p < 0.001) cho Non-SVR.
+Nghiên cứu này trình bày một framework học máy toàn diện nhằm dự đoán phản ứng điều trị (SVR vs Non-SVR) dựa trên ba chiến lược trích xuất đặc trưng: (1) đặc trưng RAS (Resistance-Associated Substitutions), (2) đặc trưng 3seq (trình tự 3 vùng gene NS3/NS5A/NS5B), và (3) bộ đặc trưng đầy đủ (full-length sequences). Mười ba thuật toán phân loại — bao gồm SVM, Random Forest, XGBoost, Gradient Boosting, Elastic Net, và các mô hình ensemble — được đánh giá thông qua cross-validation 5-fold, tối ưu ngưỡng bằng chỉ số Youden's J, và phân tích độ nhạy bootstrap (1.000 lần lặp). Khả năng diễn giải mô hình được thực hiện bằng SHAP values.
+
+**Kết quả nổi bật theo chiến lược đặc trưng:**
+- **RAS**: Random Forest đạt CV AUC cao nhất (0.8845), SVM đạt test AUC 0.8303
+- **3seq Amino Acid**: Random Forest dẫn đầu (CV AUC = 0.8824), bootstrap AUC trung bình đạt 0.9021
+- **3seq Nucleotide**: XGBoost dẫn đầu (CV AUC = 0.8973), SVM bootstrap AUC đạt 0.9093
+- **Full Amino Acid**: Elastic Net đạt CV AUC cao nhất toàn bộ nghiên cứu (0.9045)
+- **Full Nucleotide**: Elastic Net và Logistic Regression cùng dẫn đầu (CV AUC = 0.8935)
+
+Phân tích Fisher's exact test xác định mutation 31M là biomarker có ý nghĩa thống kê mạnh nhất (OR = 13.68, p < 0.001) cho Non-SVR.
 
 ---
 
@@ -38,19 +47,23 @@ Dự đoán phản ứng điều trị là một thách thức quan trọng tron
 
 ### 2.2. Chiến lược đặc trưng
 
-Ba chiến lược được đánh giá song song:
+Ba chiến lược được đánh giá song song, mỗi chiến lược xử lý cả hai dạng mã hóa (Amino Acid và Nucleotide) khi áp dụng:
 
-| Chiến lược | Mô tả | Số lượng features |
-|-----------|-------|-------------------|
-| **RAS** | Chỉ sử dụng đặc trưng mutation RAS, được chọn lọc qua Fisher's exact test | Thấp |
-| **3seq** | Sử dụng đặc trưng trình tự 3seq | Trung bình |
-| **Full** | Kết hợp tất cả đặc trưng có sẵn | Cao |
+| Chiến lược | Mô tả | Mã hóa | Số lượng features |
+|-----------|-------|--------|-------------------|
+| **RAS** | Đặc trưng mutation RAS, chọn lọc qua Fisher's exact test | Numerical + one-hot genotype | Thấp |
+| **3seq** | Trình tự 3 vùng gene (NS3, NS5A, NS5B) riêng biệt | Aa: integers 1–20; Nu: integers 1–4 | Trung bình |
+| **Full** | Trình tự đầy đủ (full-length) từ cột 'Full aa' / 'Full Nu' | Aa: integers 1–20; Nu: integers 1–4 | Cao |
+
+> **Lưu ý**: 3seq và Full đều sử dụng `pad_sequences()` (post padding, value=0) để đồng nhất chiều dài features. 3seq ghép nối 3 vùng gene, trong khi Full sử dụng trình tự nguyên vẹn.
 
 ### 2.3. Tiền xử lý dữ liệu
 
 #### 2.3.1. Mã hóa đặc trưng
-- Biến mục tiêu: "Non SVR" → 1, "SVR" → 0
-- Genotype features: One-hot encoding
+- Biến mục tiêu: "Non SVR" → 1, "SVR" → 0 (mapping: `{'Yes': 1, 'No': 0, 'SVR': 0, 'Non SVR': 1}`)
+- **RAS**: Genotype features → One-hot encoding
+- **3seq**: Amino acid → integers 1–20 (alphabet "ACDEFGHIKLMNPQRSTVWY"); Nucleotide → integers 1–4 ({A:1, C:2, G:3, T:4})
+- **Full**: Tương tự 3seq nhưng từ trình tự full-length
 
 #### 2.3.2. Pipeline tiền xử lý (cho mỗi mô hình)
 ```
@@ -143,12 +156,95 @@ Mười ba thuật toán được đánh giá, bao gồm:
 | FDA (QDA) | 0.7009 | 12 |
 | Naive Bayes | 0.6896 | 13 |
 
-### 3.2. Hiệu suất Test Set (RAS Features — Từ notebook output)
+### 3.2. Hiệu suất Cross-Validation (3seq Features)
 
-- **SVM**: Test AUC = 0.8303
-- Các mô hình khác: tham khảo file kết quả Excel
+#### 3seq Amino Acid
 
-### 3.3. Phân tích RAS Significance (Fisher's Exact Test)
+| Thuật toán | Best CV AUC | Xếp hạng |
+|-----------|-------------|----------|
+| Random Forest | 0.8824 | 1 |
+| Stacking Classifier | 0.8810 | 2 |
+| Neural Network | 0.8726 | 3 |
+| Logistic Regression | 0.8685 | 4 |
+| Elastic Net | 0.8658 | 5 |
+| Voting Classifier | 0.8655 | 6 |
+| GBM | 0.8601 | 7 |
+| XGBoost | 0.8488 | 8 |
+| SVM | 0.8411 | 9 |
+| KNN | 0.8015 | 10 |
+| Decision Tree | 0.7411 | 11 |
+| Naive Bayes | 0.6649 | 12 |
+| FDA (QDA) | 0.5756 | 13 |
+
+#### 3seq Nucleotide
+
+| Thuật toán | Best CV AUC | Xếp hạng |
+|-----------|-------------|----------|
+| XGBoost | 0.8973 | 1 |
+| Elastic Net | 0.8884 | 2 |
+| Logistic Regression | 0.8863 | 3 |
+| Stacking Classifier | 0.8815 | 4 |
+| Neural Network | 0.8762 | 5 |
+| Random Forest | 0.8652 | 6 |
+| Voting Classifier | 0.8628 | 7 |
+| SVM | 0.8577 | 8 |
+| GBM | 0.8354 | 9 |
+| KNN | 0.7789 | 10 |
+| Naive Bayes | 0.7583 | 11 |
+| FDA (QDA) | 0.7140 | 12 |
+| Decision Tree | 0.6499 | 13 |
+
+### 3.3. Hiệu suất Cross-Validation (Full Features)
+
+#### Full Amino Acid
+
+| Thuật toán | Best CV AUC | Xếp hạng |
+|-----------|-------------|----------|
+| Elastic Net | **0.9045** | 1 |
+| Logistic Regression | 0.9000 | 2 |
+| Random Forest | 0.8997 | 3 |
+| Neural Network | 0.8932 | 4 |
+| Stacking Classifier | 0.8824 | 5 |
+| Voting Classifier | 0.8804 | 6 |
+| XGBoost | 0.8708 | 7 |
+| GBM | 0.8414 | 8 |
+| SVM | 0.8342 | 9 |
+| KNN | 0.8052 | 10 |
+| Decision Tree | 0.7204 | 11 |
+| Naive Bayes | 0.6649 | 12 |
+| FDA (QDA) | 0.4667 | 13 |
+
+#### Full Nucleotide
+
+| Thuật toán | Best CV AUC | Xếp hạng |
+|-----------|-------------|----------|
+| Elastic Net | 0.8935 | 1 |
+| Logistic Regression | 0.8935 | 2 |
+| Stacking Classifier | 0.8890 | 3 |
+| Random Forest | 0.8845 | 4 |
+| Voting Classifier | 0.8777 | 5 |
+| Neural Network | 0.8759 | 6 |
+| XGBoost | 0.8726 | 7 |
+| GBM | 0.8491 | 8 |
+| SVM | 0.8443 | 9 |
+| KNN | 0.7923 | 10 |
+| FDA (QDA) | 0.7446 | 11 |
+| Naive Bayes | 0.7351 | 12 |
+| Decision Tree | 0.7116 | 13 |
+
+### 3.4. Hiệu suất Test Set
+
+| Notebook | Model | Test AUC | Ghi chú |
+|----------|-------|----------|---------|
+| RAS | SVM | 0.8303 | Tốt nhất trên test |
+| 3seq Aa | SVM | 0.8105 | Ổn định |
+| 3seq Nu | SVM | 0.9096 | Cao nhất toàn bộ test AUC |
+| Full Aa | SVM | 0.1209 | ⚠️ Anomaly — overfitting |
+| Full Nu | SVM | 0.1199 | ⚠️ Anomaly — overfitting |
+
+> **Phát hiện quan trọng**: SVM thất bại nghiêm trọng trên Full features (test AUC ~0.12, predict tất cả positive). Nguyên nhân có thể là PCA(0.95) trên full-length sequences gây overfitting.
+
+### 3.5. Phân tích RAS Significance (Fisher's Exact Test)
 
 | Mutation | n_present | Non-SVR present | SVR present | Odds Ratio | p-value | Ý nghĩa |
 |----------|-----------|-----------------|-------------|------------|---------|---------|
@@ -158,16 +254,28 @@ Mười ba thuật toán được đánh giá, bao gồm:
 
 > **Phát hiện quan trọng**: Mutation 31M có mối liên hệ rất mạnh với thất bại điều trị (Non-SVR), với tỷ số chênh OR = 13.68 và p-value cực kỳ nhỏ (1.16 × 10⁻⁷).
 
-### 3.4. Phân nhóm hiệu suất thuật toán
+### 3.6. Phân nhóm hiệu suất thuật toán (tổng hợp tất cả chiến lược)
 
-**Nhóm A — Hiệu suất cao (AUC > 0.85):**
-- Random Forest, XGBoost
+**Nhóm A — Hiệu suất cao ổn định (CV AUC > 0.85 trên đa số chiến lược):**
+- Random Forest, Elastic Net, XGBoost, Logistic Regression (trên 3seq/Full)
 
-**Nhóm B — Hiệu suất khá (AUC 0.75–0.85):**
-- Elastic Net, Voting, KNN, GBM, Stacking, SVM, Decision Tree
+**Nhóm B — Hiệu suất khá (CV AUC 0.75–0.85):**
+- GBM, Voting, Stacking, Neural Network, SVM, KNN
 
-**Nhóm C — Hiệu suất thấp (AUC < 0.75):**
-- Logistic Regression, Neural Network, FDA, Naive Bayes
+**Nhóm C — Hiệu suất thấp (CV AUC < 0.75 trên một hoặc nhiều chiến lược):**
+- Decision Tree, FDA (QDA), Naive Bayes
+
+### 3.7. So sánh hiệu suất tốt nhất theo chiến lược đặc trưng
+
+| Chiến lược | Best Model | Best CV AUC | Best Bootstrap AUC | Best Model (Bootstrap) |
+|-----------|-----------|-------------|--------------------|-----------------------|
+| RAS | Random Forest | 0.8845 | — | — |
+| 3seq Aa | Random Forest | 0.8824 | 0.9101 | GBM |
+| 3seq Nu | XGBoost | 0.8973 | 0.9093 | SVM |
+| Full Aa | Elastic Net | **0.9045** | 0.9156 | GBM |
+| Full Nu | Elastic Net/LR | 0.8935 | 0.8995 | Random Forest |
+
+> **Nhận xét**: Full Amino Acid features cho CV AUC cao nhất toàn bộ nghiên cứu (0.9045 — Elastic Net), trong khi 3seq Nucleotide cho test performance tốt nhất (SVM test AUC = 0.9096).
 
 ---
 
@@ -175,12 +283,16 @@ Mười ba thuật toán được đánh giá, bao gồm:
 
 ### 4.1. So sánh thuật toán
 
-Random Forest và XGBoost đạt hiệu suất cao nhất, phù hợp với đặc điểm dữ liệu y sinh:
-- Khả năng xử lý mối quan hệ phi tuyến
-- Robust với outliers
-- Feature importance tích hợp
+**Theo chiến lược RAS**: Random Forest và XGBoost đạt hiệu suất cao nhất, phù hợp với đặc điểm dữ liệu mutation (ít features, rời rạc).
 
-Các mô hình tuyến tính (LR, Elastic Net) mặc dù có AUC thấp hơn nhưng cung cấp khả năng diễn giải quan trọng cho ứng dụng lâm sàng.
+**Theo chiến lược 3seq**: Random Forest dẫn đầu trên Amino Acid, XGBoost dẫn đầu trên Nucleotide. Neural Network cải thiện đáng kể (CV AUC 0.87 vs 0.72 trên RAS) — sequence data phù hợp hơn cho deep learning.
+
+**Theo chiến lược Full**: Mô hình tuyến tính (Elastic Net, Logistic Regression) bất ngờ đạt hiệu suất cao nhất (CV AUC ~0.90), vượt trội các mô hình phi tuyến. Điều này gợi ý:
+- Full-length sequence features chứa tín hiệu tuyến tính mạnh
+- Regularization (L1+L2) hiệu quả trong xử lý chiều cao
+- Tree-based models có thể bị noise từ nhiều features không liên quan
+
+⚠️ **SVM Anomaly trên Full features**: SVM thất bại nghiêm trọng (test AUC ~0.12) mặc dù CV AUC ~0.84. PCA(0.95) trên full-length sequences có thể tạo components không representative, gây overfitting.
 
 ### 4.2. Xử lý mất cân bằng lớp
 
@@ -191,14 +303,29 @@ Pipeline sử dụng chiến lược kết hợp:
 
 ⚠️ **Lưu ý**: Kết hợp SMOTE với class_weight có thể tạo thiên lệch kép. Cần thực nghiệm thêm để xác định chiến lược tối ưu.
 
-### 4.3. Hạn chế
+### 4.3. So sánh chiến lược đặc trưng
+
+| Khía cạnh | RAS | 3seq | Full |
+|-----------|-----|------|------|
+| Best CV AUC | 0.8845 | 0.8973 (Nu) | **0.9045** (Aa) |
+| Mô hình tốt nhất | RF, XGBoost | RF (Aa), XGBoost (Nu) | Elastic Net, LR |
+| Mô hình tuyến tính | Trung bình | Tốt (0.87–0.89) | Rất tốt (0.90) |
+| Neural Network | Yếu (0.72) | Tốt (0.87) | Tốt (0.89) |
+| SVM stability | Ổn định | Ổn định | ⚠️ Thất bại |
+| FDA viability | Yếu (0.70) | Rất yếu (0.58) | Thất bại (0.47) |
+| Ưu điểm đặc trưng | Biomarker discovery | Cân bằng tính-năng/hiệu-suất | CV AUC cao nhất |
+| Nhược điểm | Ít features | Padding noise | Chiều rất cao, SVM fail |
+
+### 4.4. Hạn chế
 
 1. **Kích thước mẫu nhỏ** (n=162): Giới hạn khả năng tổng quát hóa
 2. **Single train/test split**: Không phản ánh đầy đủ variance — cần nested CV
 3. **SHAP analysis giới hạn**: Chỉ 20 samples → có thể không đại diện
 4. **Thiếu external validation**: Chưa có tập dữ liệu độc lập để kiểm chứng
+5. **SVM anomaly trên Full features**: Cần điều tra PCA interaction với full-length sequences
+6. **FDA/Naive Bayes không phù hợp**: Giả định phân phối vi phạm trên tất cả chiến lược
 
-### 4.4. Biomarker RAS
+### 4.5. Biomarker RAS
 
 Mutation 31M nổi bật như biomarker tiềm năng:
 - Odds ratio 13.68 cho thấy bệnh nhân mang mutation này có nguy cơ thất bại điều trị cao gấp ~14 lần
@@ -210,10 +337,14 @@ Mutation 31M nổi bật như biomarker tiềm năng:
 ## 5. Kết Luận (Conclusion)
 
 ### 5.1. Kết quả chính
-1. **Random Forest** và **XGBoost** là hai thuật toán hiệu quả nhất cho bài toán dự đoán phản ứng điều trị
-2. **Mutation 31M** được xác định là biomarker có ý nghĩa thống kê mạnh nhất
-3. Pipeline xử lý mất cân bằng lớp (SMOTE + class_weight) cải thiện hiệu suất đáng kể
-4. Phân tích bootstrap 1.000 lần lặp cung cấp ước lượng tin cậy về hiệu suất mô hình
+1. **Elastic Net** đạt CV AUC cao nhất toàn bộ nghiên cứu (0.9045) trên Full Amino Acid features
+2. **Random Forest** và **XGBoost** là hai thuật toán hiệu quả nhất trên RAS và 3seq features
+3. **Mô hình tuyến tính** (Elastic Net, LR) bất ngờ vượt trội trên Full features, gợi ý tín hiệu tuyến tính mạnh trong full-length sequences
+4. **Nucleotide features** nhìn chung cho kết quả test tốt hơn Amino Acid (3seq Nu SVM test AUC = 0.9096)
+5. **Mutation 31M** được xác định là biomarker có ý nghĩa thống kê mạnh nhất (OR = 13.68, p < 0.001)
+6. **FDA, Naive Bayes** hiệu suất thấp nhất quán trên tất cả chiến lược — nên loại bỏ
+7. **Neural Network** cải thiện đáng kể trên sequence data (0.87–0.89) so với RAS (0.72)
+8. **SVM thất bại** trên Full features (test AUC ~0.12) — PCA anomaly cần điều tra
 
 ### 5.2. Hướng nghiên cứu tiếp theo
 1. **Nested cross-validation** để ước lượng generalization error không thiên lệch
@@ -221,7 +352,10 @@ Mutation 31M nổi bật như biomarker tiềm năng:
 3. **Feature selection tích hợp** (embedded methods) thay vì chỉ dựa vào VarianceThreshold
 4. **TreeSHAP** cho mô hình tree-based (nhanh hơn KernelSHAP đáng kể)
 5. **Calibration analysis** để đánh giá chất lượng xác suất dự đoán
-6. **Tối ưu ensemble** — loại bỏ mô hình yếu (FDA, Naive Bayes, MLP) và tập trung vào top-performing models
+6. **Tối ưu ensemble** — loại bỏ mô hình yếu (FDA, Naive Bayes) và tập trung vào top-performing models
+7. **Điều tra SVM anomaly** trên Full features — thử bỏ PCA hoặc giảm n_components
+8. **K-mer features** — thay thế integer encoding bằng k-mer counting có thể cải thiện hiệu suất
+9. **So sánh 3seq vs Full trên cùng mô hình** — xác định chiến lược tối ưu cho từng thuật toán
 
 ---
 
@@ -272,6 +406,7 @@ $$
 | numpy | ≥1.20 | Numerical computing |
 | pandas | ≥1.3 | Data manipulation |
 | matplotlib | ≥3.4 | Visualization |
+| tensorflow/keras | ≥2.0 | pad_sequences cho 3seq/Full encoding |
 
 ---
 
