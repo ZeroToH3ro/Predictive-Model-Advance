@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(/Users/mavericktrinh/Personal/Predictive-Model-Advance/.venv/bin/python -c ' *)",
+      "Bash(/Users/mavericktrinh/Personal/Predictive-Model-Advance/.venv/bin/python /tmp/update_notebook.py)"
+    ],
+    "additionalDirectories": [
+      "/tmp",
+      "/private/tmp"
+    ]
+  }
+}
